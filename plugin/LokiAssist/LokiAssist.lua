@@ -6,11 +6,6 @@ local frame = CreateFrame("Frame")
 local updateTimer = 0
 local loaded = false
 
--- Detect if we're in an instance
-local function CheckInstanceStatus()
-    local inInstance, instanceType = CheckInstanceStatus()
-    return inInstance, instanceType  -- instanceType: "party", "raid", "pvp", "arena", nil
-end
 
 -- Game state
 local gameState = {
@@ -73,7 +68,7 @@ local function TryGetUnitInfo()
     end
 
     -- Method 5: Instance info
-    local inInstance, instanceType = CheckInstanceStatus()
+    local inInstance, instanceType = IsInInstance()
     data.inInstance = inInstance or false
     data.instanceType = instanceType or "outdoor"
 
@@ -105,7 +100,7 @@ frame:SetScript("OnEvent", function(self, event)
         gameState.playerName = UnitName("player") or ""
         gameState.playerClass = select(2, UnitClass("player")) or ""
 
-        local inInstance, instanceType = CheckInstanceStatus()
+        local inInstance, instanceType = IsInInstance()
         gameState.inInstance = inInstance
         gameState.instanceType = instanceType or "outdoor"
 
@@ -121,7 +116,7 @@ frame:SetScript("OnEvent", function(self, event)
         gameState.inCombat = false
 
     elseif event == "ZONE_CHANGED_NEW_AREA" then
-        local inInstance, instanceType = CheckInstanceStatus()
+        local inInstance, instanceType = IsInInstance()
         gameState.inInstance = inInstance
         gameState.instanceType = instanceType or "outdoor"
         pcall(function()
@@ -208,7 +203,7 @@ SlashCmdList["LOKI"] = function(msg)
         print("Testing data send...")
         frame:SendState(TryGetUnitInfo())
     elseif msg == "instance" then
-        local inInstance, instanceType = CheckInstanceStatus()
+        local inInstance, instanceType = IsInInstance()
         print("In Instance: " .. (inInstance and "Yes" or "No"))
         print("Instance Type: " .. (instanceType or "N/A"))
     end
