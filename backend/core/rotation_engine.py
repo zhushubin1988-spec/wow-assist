@@ -1,18 +1,18 @@
 """
 Rotation Engine
-Manages the combat rotation logic
+Manages the combat rotation logic - works with screenshot reader
 """
 import time
 from typing import Dict, List, Optional
 
-from .state_reader import StateReader
-from .key_simulator import KeySimulator
+from core.screenshot_reader import ScreenshotReader
+from core.key_simulator import KeySimulator
 from config.rotations import get_rotation
 
 
 class RotationEngine:
-    def __init__(self, state_reader: StateReader, key_simulator: KeySimulator):
-        self.state_reader = state_reader
+    def __init__(self, screenshot_reader: ScreenshotReader, key_simulator: KeySimulator):
+        self.screenshot_reader = screenshot_reader
         self.key_simulator = key_simulator
         self.is_running = False
 
@@ -76,8 +76,10 @@ class RotationEngine:
         if current_time - self.last_action_time < self.action_cooldown:
             return
 
+        # Get game state from screenshot
+        state = self.screenshot_reader.get_game_state()
+
         # Check if we should be in combat
-        state = self.state_reader.read_state()
         in_combat = state.get("inCombat", False)
 
         if self.combat_protect and not in_combat:
@@ -95,6 +97,9 @@ class RotationEngine:
 
         # Check GCD
         if self.gcd_remaining > 0:
+            current_time = time.time()
+            self.gcd_remaining = max(0, self.gcd_remaining - (current_time - self.last_gcd_time))
+            self.last_gcd_time = current_time
             return
 
         # Check health for self-preservation
@@ -116,26 +121,11 @@ class RotationEngine:
         key = spell.get("key")
         conditions = spell.get("conditions", {})
 
-        # Check cooldown
-        cd = self.state_reader.get_cooldown(spell_name)
-        if cd > 0:
-            return False
-
         # Check power requirement
         power = state.get("power", 0)
         power_cost = conditions.get("power", 0)
         if power < power_cost:
             return False
-
-        # Check buff requirements
-        if "has_buff" in conditions:
-            if not self.state_reader.has_buff(conditions["has_buff"]):
-                return False
-
-        # Check debuff requirements
-        if "has_not_debuff" in conditions:
-            if self.state_reader.has_debuff(conditions["has_not_debuff"]):
-                return False
 
         # Check target health
         if "target_health_above" in conditions:
@@ -144,12 +134,6 @@ class RotationEngine:
 
         if "target_health_below" in conditions:
             if state.get("targetHealthPercent", 100) > conditions["target_health_below"]:
-                return False
-
-        # Check custom condition
-        if "custom" in conditions:
-            custom_func = conditions["custom"]
-            if callable(custom_func) and not custom_func(state, self.state_reader):
                 return False
 
         return True
@@ -171,15 +155,3 @@ class RotationEngine:
         gcd = spell.get("gcd", 1.5)
         self.gcd_remaining = gcd
         self.last_gcd_time = time.time()
-
-        # Use trinket on cooldowns if enabled
-        if self.auto_trinket:
-            state = self.state_reader.read_state()
-            if state.get("trinketReady", True):
-                self.key_simulator.use_item("trinket1")
-
-        # Use potion on cooldowns if enabled
-        if self.auto_potion:
-            state = self.state_reader.read_state()
-            if state.get("potionReady", True):
-                self.key_simulator.use_item("potion")

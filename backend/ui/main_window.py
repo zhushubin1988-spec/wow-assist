@@ -1,5 +1,5 @@
 """
-Main Window UI
+Main Window UI - OCR-based version
 """
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout
 from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QCheckBox, QGroupBox
@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 import sys
 
-from core.chat_log_reader import ChatLogReader
+from core.screenshot_reader import ScreenshotReader
 from core.key_simulator import KeySimulator
 from core.rotation_engine import RotationEngine
 
@@ -19,18 +19,18 @@ class MainWindow:
         self.window.setWindowTitle("WoW Assist - 魔兽世界自动输出辅助")
         self.window.setGeometry(100, 100, 500, 600)
 
-        # Core components
-        self.state_reader = ChatLogReader()
+        # Core components - using screenshot instead of chat log
+        self.screenshot_reader = ScreenshotReader()
         self.key_simulator = KeySimulator()
-        self.rotation_engine = RotationEngine(self.state_reader, self.key_simulator)
+        self.rotation_engine = RotationEngine(self.screenshot_reader, self.key_simulator)
 
         self.is_running = False
         self.setup_ui()
 
-        # Update timer
+        # Update timer - check every 100ms
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_loop)
-        self.timer.start(100)  # 100ms update interval
+        self.timer.start(100)
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -38,7 +38,7 @@ class MainWindow:
         layout = QVBoxLayout(central_widget)
 
         # Title
-        title = QLabel("WoW Assist")
+        title = QLabel("WoW Assist - OCR版本")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -48,12 +48,12 @@ class MainWindow:
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
 
-        # Character Info Group
-        info_group = QGroupBox("角色信息")
+        # Info
+        info_group = QGroupBox("游戏状态")
         info_layout = QVBoxLayout()
 
-        self.player_name_label = QLabel("玩家: 未连接")
-        self.class_label = QLabel("职业: 未连接")
+        self.player_name_label = QLabel("等待截图...")
+        self.class_label = QLabel("职业: 未选择")
         self.health_label = QLabel("生命值: 0%")
         self.energy_label = QLabel("能量: 0")
         self.in_combat_label = QLabel("战斗状态: 否")
@@ -66,7 +66,7 @@ class MainWindow:
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
 
-        # Settings Group
+        # Settings
         settings_group = QGroupBox("设置")
         settings_layout = QVBoxLayout()
 
@@ -102,7 +102,7 @@ class MainWindow:
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
 
-        # Control Buttons
+        # Buttons
         button_layout = QHBoxLayout()
 
         self.start_button = QPushButton("开始")
@@ -117,7 +117,7 @@ class MainWindow:
         layout.addLayout(button_layout)
 
         # Log
-        self.log_label = QLabel("日志: 就绪")
+        self.log_label = QLabel("日志: 就绪 (使用OCR截屏方案)")
         self.log_label.setWordWrap(True)
         layout.addWidget(self.log_label)
 
@@ -145,16 +145,13 @@ class MainWindow:
         self.status_label.setText("状态: 已停止")
 
     def update_loop(self):
-        # Update game state
-        state = self.state_reader.read_state()
+        # Update game state from screenshot
+        state = self.screenshot_reader.get_game_state()
 
         # Update UI
-        if state:
-            self.player_name_label.setText(f"玩家: {state.get('playerName', '未连接')}")
-            self.class_label.setText(f"职业: {state.get('playerClass', '未连接')}")
-            self.health_label.setText(f"生命值: {state.get('healthPercent', 0)}%")
-            self.energy_label.setText(f"能量: {state.get('power', 0)}")
-            self.in_combat_label.setText(f"战斗状态: {'是' if state.get('inCombat', False) else '否'}")
+        self.health_label.setText(f"生命值: {state.get('healthPercent', 0)}%")
+        self.energy_label.setText(f"能量: {state.get('power', 0)}/{state.get('maxPower', 100)}")
+        self.in_combat_label.setText(f"战斗状态: {'是' if state.get('inCombat', False) else '否'}")
 
         # Update rotation if running
         if self.is_running:
@@ -166,3 +163,8 @@ class MainWindow:
     def run(self):
         self.window.show()
         return self.app.exec()
+
+
+if __name__ == "__main__":
+    main = MainWindow()
+    main.run()
