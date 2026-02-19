@@ -37,31 +37,3 @@ jobs:
         name: WoWAssist-Windows
         path: backend/dist/WoWAssist.exe
         retention-days: 30
-
-  release:
-    needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: WoWAssist-Windows
-        path: release
-
-    - name: Create Tag
-      uses: actions-ecosystem/action-create-tag@v1
-      with:
-        tag: v1.0.0
-        message: 'Release v1.0.0'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release/WoWAssist.exe
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
