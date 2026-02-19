@@ -1,8 +1,8 @@
 -- LokiAssist.lua
 -- WoW Auto Rotation Assistant
+-- Uses macros to communicate with Python backend
 
 local frame = CreateFrame("Frame")
-local stateFilePath = nil
 local updateTimer = 0
 local loaded = false
 
@@ -18,11 +18,8 @@ local gameState = {
     targetHealthPercent = 100,
     bossName = "",
     bossHealthPercent = 100,
-    cooldowns = {},
     buffs = {},
     debuffs = {},
-    trinketReady = true,
-    potionReady = true,
     position = {x = 0, y = 0},
     targetPosition = {x = 0, y = 0}
 }
@@ -39,16 +36,9 @@ frame:SetScript("OnEvent", function(self, event)
         local class = select(2, UnitClass("player"))
         gameState.playerName = name
         gameState.playerClass = class
-
-        -- Set up state file path
-        local appData = os.getenv("LOCALAPPDATA")
-        if appData then
-            stateFilePath = appData .. "/LokiAssist/game_state.json"
-        else
-            stateFilePath = nil
-        end
-
         loaded = true
+
+        print("|cFF00FF00LokiAssist|r loaded! Version 1.1.0")
     elseif event == "PLAYER_REGEN_ENABLED" then
         gameState.inCombat = false
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -61,8 +51,7 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     if not loaded then return end
     updateTimer = updateTimer + elapsed
     if updateTimer >= 0.5 then
-        pcall(self.UpdateState, self)
-        pcall(self.SaveState, self)
+        self:UpdateState()
         updateTimer = 0
     end
 end)
@@ -112,48 +101,5 @@ function frame:UpdateState()
     end
 end
 
-function frame:SaveState()
-    if not stateFilePath then return end
-
-    local trinket1Slot = 13
-    local start1, duration1 = GetInventoryItemCooldown("player", trinket1Slot)
-    if start1 then
-        gameState.trinketReady = (start1 == 0 or (GetTime() - start1) >= duration1)
-    end
-
-    gameState.potionReady = false
-
-    local json = TableToJSON(gameState)
-    local file = io.open(stateFilePath, "w")
-    if file then
-        file:write(json)
-        file:close()
-    end
-end
-
-function TableToJSON(t)
-    local result = "{\n"
-    local keys = {}
-    for k in pairs(t) do table.insert(keys, k) end
-    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
-
-    for i, k in ipairs(keys) do
-        local v = t[k]
-        local comma = i < #keys and "," or ""
-        result = result .. '  "' .. tostring(k) .. '": '
-
-        if type(v) == "string" then
-            result = result .. '"' .. v .. '"' .. comma .. "\n"
-        elseif type(v) == "number" then
-            result = result .. tostring(v) .. comma .. "\n"
-        elseif type(v) == "boolean" then
-            result = result .. (v and "true" or "false") .. comma .. "\n"
-        elseif type(v) == "table" then
-            result = result .. TableToJSON(v) .. comma .. "\n"
-        else
-            result = result .. "null" .. comma .. "\n"
-        end
-    end
-    result = result .. "}"
-    return result
-end
+-- Expose gameState globally for Python to read
+_G.LokiAssistState = gameState
