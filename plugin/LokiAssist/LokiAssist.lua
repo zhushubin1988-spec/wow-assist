@@ -26,17 +26,13 @@ local gameState = {
     targetPosition = {x = 0, y = 0}
 }
 
--- Events
+-- Register events
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-frame:RegisterEvent("UNIT_POWER")
-frame:RegisterEvent("UNIT_HEALTH")
-frame:RegisterEvent("PLAYER_TARGET_CHANGED")
-frame:RegisterEvent("UNIT_AURA")
 
-frame:SetScript("OnEvent", function(self, event, ...)
+frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
         local name = UnitName("player")
         local class = select(2, UnitClass("player"))
@@ -49,14 +45,37 @@ frame:SetScript("OnEvent", function(self, event, ...)
         os.execute('mkdir "' .. addonDir .. '" 2>nul')
         stateFilePath = addonDir .. "/game_state.json"
 
-        print("|cFF00FF00LokiAssist|r loaded! Version 1.0.4")
+        print("|cFF00FF00LokiAssist|r loaded! Version 1.0.5")
         print("State file: " .. stateFilePath)
+
+        -- Register slash commands after login
+        SLASH_LOKI1 = "/loki"
+        SlashCmdList["LOKI"] = HandleSlashCommand
     elseif event == "PLAYER_REGEN_ENABLED" then
         gameState.inCombat = false
     elseif event == "PLAYER_REGEN_DISABLED" then
         gameState.inCombat = true
     end
 end)
+
+-- Slash command handler
+function HandleSlashCommand(msg)
+    msg = strlower(msg or "")
+    if msg == "test" then
+        print("LokiAssist: Test command works!")
+        print("State file: " .. (stateFilePath or "nil"))
+    elseif msg == "status" then
+        print("HP: " .. gameState.healthPercent .. "% | Power: " .. gameState.power)
+        print("Combat: " .. (gameState.inCombat and "Yes" or "No"))
+        print("Target: " .. gameState.targetName .. " (" .. gameState.targetHealthPercent .. "%)")
+    elseif msg == "save" then
+        frame:UpdateState()
+        frame:SaveState()
+        print("State saved!")
+    else
+        print("Commands: /loki test, /loki status, /loki save")
+    end
+end
 
 -- Update loop
 frame:SetScript("OnUpdate", function(self, elapsed)
@@ -69,15 +88,12 @@ frame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 function frame:UpdateState()
-    -- Player info
     local health = UnitHealth("player")
     local maxHealth = UnitHealthMax("player")
     gameState.healthPercent = math.floor((health / maxHealth) * 100)
-
     gameState.power = UnitPower("player")
     gameState.maxPower = UnitPowerMax("player")
 
-    -- Target info
     if UnitExists("target") then
         gameState.targetName = UnitName("target")
         local thp = UnitHealth("target")
@@ -88,7 +104,6 @@ function frame:UpdateState()
         gameState.targetHealthPercent = 100
     end
 
-    -- Position
     local px, py = GetPlayerMapPosition("player")
     gameState.position = {x = px * 100, y = py * 100}
 
@@ -97,14 +112,12 @@ function frame:UpdateState()
         gameState.targetPosition = {x = tx * 100, y = ty * 100}
     end
 
-    -- Buffs
     gameState.buffs = {}
     for i = 1, 40 do
         local name = UnitBuff("player", i)
         if name then gameState.buffs[name] = true end
     end
 
-    -- Debuffs
     gameState.debuffs = {}
     if UnitExists("target") then
         for i = 1, 40 do
@@ -117,12 +130,10 @@ end
 function frame:SaveState()
     if not stateFilePath then return end
 
-    -- Check items
     local trinket1Slot = 13
     local start1, duration1 = GetInventoryItemCooldown("player", trinket1Slot)
     gameState.trinketReady = (start1 == 0 or (GetTime() - start1) >= duration1)
 
-    -- Check potion
     gameState.potionReady = false
     for bag = 0, 4 do
         for slot = 1, GetContainerNumSlots(bag) do
@@ -139,8 +150,7 @@ function frame:SaveState()
         end
     end
 
-    -- Simple JSON
-    local json = self:TableToJSON(gameState)
+    local json = TableToJSON(gameState)
     local file = io.open(stateFilePath, "w")
     if file then
         file:write(json)
@@ -148,7 +158,7 @@ function frame:SaveState()
     end
 end
 
-function frame:TableToJSON(t)
+function TableToJSON(t)
     local result = "{\n"
     local keys = {}
     for k in pairs(t) do table.insert(keys, k) end
@@ -157,12 +167,7 @@ function frame:TableToJSON(t)
     for i, k in ipairs(keys) do
         local v = t[k]
         local comma = i < #keys and "," or ""
-
-        if type(k) == "string" then
-            result = result .. '  "' .. k .. '": '
-        else
-            result = result .. '  "' .. tostring(k) .. '": '
-        end
+        result = result .. '  "' .. tostring(k) .. '": '
 
         if type(v) == "string" then
             result = result .. '"' .. v .. '"' .. comma .. "\n"
@@ -171,33 +176,11 @@ function frame:TableToJSON(t)
         elseif type(v) == "boolean" then
             result = result .. (v and "true" or "false") .. comma .. "\n"
         elseif type(v) == "table" then
-            result = result .. self:TableToJSON(v) .. comma .. "\n"
+            result = result .. TableToJSON(v) .. comma .. "\n"
         else
             result = result .. "null" .. comma .. "\n"
         end
     end
     result = result .. "}"
     return result
-end
-
--- Slash commands
-SLASH_LOKI1 = "/loki"
-SLASH_LOKI2 = "/lokiasist"
-
-SlashCmdList["LOKI"] = function(msg)
-    local cmd = strlower(msg or "")
-    if cmd == "test" then
-        print("LokiAssist: Test command works!")
-        print("State file: " .. (stateFilePath or "nil"))
-    elseif cmd == "status" then
-        print("HP: " .. gameState.healthPercent .. "% | Power: " .. gameState.power)
-        print("Combat: " .. (gameState.inCombat and "Yes" or "No"))
-        print("Target: " .. gameState.targetName .. " (" .. gameState.targetHealthPercent .. "%)")
-    elseif cmd == "save" then
-        frame:UpdateState()
-        frame:SaveState()
-        print("State saved!")
-    else
-        print("Commands: /loki test, /loki status, /loki save")
-    end
 end
