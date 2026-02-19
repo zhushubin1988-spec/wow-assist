@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 import sys
 
-from core.screenshot_reader import ScreenshotReader
+from core.memory_reader import create_memory_reader
 from core.key_simulator import KeySimulator
 from core.rotation_engine import RotationEngine
 
@@ -76,10 +76,10 @@ class MainWindow:
         self.window.setWindowTitle("WoW Assist - 魔兽世界自动输出辅助")
         self.window.setGeometry(100, 100, 600, 700)
 
-        # Core components
-        self.screenshot_reader = ScreenshotReader()
+        # Core components - using memory reader
+        self.memory_reader = create_memory_reader()
         self.key_simulator = KeySimulator()
-        self.rotation_engine = RotationEngine(self.screenshot_reader, self.key_simulator)
+        self.rotation_engine = RotationEngine(self.memory_reader, self.key_simulator)
 
         # Keybinds
         self.current_class_keybinds = {}
@@ -283,7 +283,7 @@ class MainWindow:
         self.status_label.setText("状态: 已停止")
 
     def update_loop(self):
-        state = self.screenshot_reader.get_game_state()
+        state = self.memory_reader.get_game_state()
 
         self.health_label.setText(f"生命值: {state.get('healthPercent', 0)}%")
         self.energy_label.setText(f"能量: {state.get('power', 0)}/{state.get('maxPower', 100)}")

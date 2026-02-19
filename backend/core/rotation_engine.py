@@ -5,14 +5,13 @@ Manages the combat rotation logic - works with screenshot reader
 import time
 from typing import Dict, List, Optional
 
-from core.screenshot_reader import ScreenshotReader
 from core.key_simulator import KeySimulator
 from config.rotations import get_rotation
 
 
 class RotationEngine:
-    def __init__(self, screenshot_reader: ScreenshotReader, key_simulator: KeySimulator):
-        self.screenshot_reader = screenshot_reader
+    def __init__(self, memory_reader, key_simulator: KeySimulator):
+        self.memory_reader = memory_reader
         self.key_simulator = key_simulator
         self.is_running = False
 
@@ -83,8 +82,8 @@ class RotationEngine:
         if current_time - self.last_action_time < self.action_cooldown:
             return
 
-        # Get game state from screenshot
-        state = self.screenshot_reader.get_game_state()
+        # Get game state from memory reader
+        state = self.memory_reader.get_game_state()
 
         # Check if we should be in combat
         in_combat = state.get("inCombat", False)
