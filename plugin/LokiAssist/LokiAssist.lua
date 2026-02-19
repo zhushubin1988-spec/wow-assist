@@ -1,56 +1,38 @@
 -- LokiAssist.lua
--- Basic version - sends minimal data
--- Version 5.1
+-- Version 5.2 - test print to chat
+-- Uses DEFAULT_CHAT_FRAME to print directly
 
-print("|cFF00FF00LokiAssist|r v5.1 loaded - type /loki status")
+print("|cFF00FF00LokiAssist|r v5.2 loaded")
 
 local f = CreateFrame("Frame")
 local timer = 0
-local ready = false
 
 local function GetData()
     local hp = UnitHealth("player")
     local maxHp = UnitHealthMax("player")
-    local hpPct = maxHp > 0 and math.floor(hp / maxHp * 100) or 100
-
+    local hpPct = maxHp > 0 and floor(hp / maxHp * 100) or 100
     local pp = UnitPower("player")
     local maxPp = UnitPowerMax("player")
-
-    local inCombat = InCombatLockdown() and 1 or 0
-
-    local hasTarget = UnitExists("target") and 1 or 0
-    local targetName = hasTarget == 1 and UnitName("target") or ""
-    local targetHp = 100
-    if hasTarget == 1 then
-        local thp = UnitHealth("target")
-        local maxThp = UnitHealthMax("target")
-        targetHp = maxThp > 0 and math.floor(thp / maxThp * 100) or 100
-    end
-
-    return hpPct, pp, maxPp, inCombat, hasTarget, targetName, targetHp
+    local ic = InCombatLockdown() and 1 or 0
+    return hpPct, pp, maxPp, ic
 end
 
 f:RegisterEvent("PLAYER_LOGIN")
 f:SetScript("OnEvent", function()
-    ready = true
+    print("LokiAssist: Ready! Timer started.")
 end)
 
 f:SetScript("OnUpdate", function(self, elapsed)
-    if not ready then return end
     timer = timer + elapsed
-    if timer > 0.5 then
-        local hpPct, pp, maxPp, inCombat, hasTarget, targetName, targetHp = GetData()
-        local msg = string.format("@LOKI@HP:%d,PP:%d,MP:%d,IC:%d,TE:%d,TN:%s,THP:%d",
-            hpPct, pp, maxPp, inCombat, hasTarget, targetName, targetHp)
-        SendChatMessage(msg, "WHISPER", nil, UnitName("player"))
+    if timer > 2 then
+        local hp, pp, mp, ic = GetData()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00[LOKI]|r HP:" .. hp .. " PP:" .. pp .. " IC:" .. ic)
         timer = 0
     end
 end)
 
 SLASH_LOKI1 = "/loki"
 SlashCmdList["LOKI"] = function()
-    local hpPct, pp, maxPp, inCombat, hasTarget, targetName, targetHp = GetData()
-    print("HP: " .. hpPct .. "% | PP: " .. pp .. "/" .. maxPp)
-    print("Combat: " .. inCombat)
-    print("Target: " .. targetName .. " (" .. targetHp .. "%)")
+    local hp, pp, mp, ic = GetData()
+    print("HP: " .. hp .. "% | PP: " .. pp .. " | Combat: " .. ic)
 end
