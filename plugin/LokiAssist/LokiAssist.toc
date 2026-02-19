@@ -1,8 +1,7 @@
 ## Interface: 120001
 ## Title: LokiAssist
-## Notes: WoW Auto Rotation Assistant
-## Author: LokiAssist
-## Version: 1.0.2
+## Notes: Test addon
+## Author: Test
+## Version: 1.0.0
 
-LokiAssist.lua
-core.lua
+test.lua
