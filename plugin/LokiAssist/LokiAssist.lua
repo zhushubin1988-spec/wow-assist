@@ -4,6 +4,7 @@
 local frame = CreateFrame("Frame")
 local stateFilePath = nil
 local updateTimer = 0
+local loaded = false
 
 -- Game state
 local gameState = {
@@ -32,7 +33,7 @@ frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 
-frame:SetScript("OnEvent", function(self, event, arg1)
+frame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
         local name = UnitName("player")
         local class = select(2, UnitClass("player"))
@@ -40,17 +41,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         gameState.playerClass = class
 
         -- Set up state file path
-        local appData = os.getenv("LOCALAPPDATA") or (os.getenv("APPDATA") .. "/Local")
-        local addonDir = appData .. "/LokiAssist"
-        os.execute('mkdir "' .. addonDir .. '" 2>nul')
-        stateFilePath = addonDir .. "/game_state.json"
+        local appData = os.getenv("LOCALAPPDATA")
+        if appData then
+            stateFilePath = appData .. "/LokiAssist/game_state.json"
+        else
+            stateFilePath = nil
+        end
 
-        print("|cFF00FF00LokiAssist|r loaded! Version 1.0.5")
-        print("State file: " .. stateFilePath)
-
-        -- Register slash commands after login
-        SLASH_LOKI1 = "/loki"
-        SlashCmdList["LOKI"] = HandleSlashCommand
+        loaded = true
     elseif event == "PLAYER_REGEN_ENABLED" then
         gameState.inCombat = false
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -58,31 +56,13 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     end
 end)
 
--- Slash command handler
-function HandleSlashCommand(msg)
-    msg = strlower(msg or "")
-    if msg == "test" then
-        print("LokiAssist: Test command works!")
-        print("State file: " .. (stateFilePath or "nil"))
-    elseif msg == "status" then
-        print("HP: " .. gameState.healthPercent .. "% | Power: " .. gameState.power)
-        print("Combat: " .. (gameState.inCombat and "Yes" or "No"))
-        print("Target: " .. gameState.targetName .. " (" .. gameState.targetHealthPercent .. "%)")
-    elseif msg == "save" then
-        frame:UpdateState()
-        frame:SaveState()
-        print("State saved!")
-    else
-        print("Commands: /loki test, /loki status, /loki save")
-    end
-end
-
 -- Update loop
 frame:SetScript("OnUpdate", function(self, elapsed)
+    if not loaded then return end
     updateTimer = updateTimer + elapsed
     if updateTimer >= 0.5 then
-        self:UpdateState()
-        self:SaveState()
+        pcall(self.UpdateState, self)
+        pcall(self.SaveState, self)
         updateTimer = 0
     end
 end)
@@ -90,7 +70,10 @@ end)
 function frame:UpdateState()
     local health = UnitHealth("player")
     local maxHealth = UnitHealthMax("player")
-    gameState.healthPercent = math.floor((health / maxHealth) * 100)
+    if maxHealth > 0 then
+        gameState.healthPercent = math.floor((health / maxHealth) * 100)
+    end
+
     gameState.power = UnitPower("player")
     gameState.maxPower = UnitPowerMax("player")
 
@@ -98,18 +81,20 @@ function frame:UpdateState()
         gameState.targetName = UnitName("target")
         local thp = UnitHealth("target")
         local maxThp = UnitHealthMax("target")
-        gameState.targetHealthPercent = math.floor((thp / maxThp) * 100)
+        if maxThp > 0 then
+            gameState.targetHealthPercent = math.floor((thp / maxThp) * 100)
+        end
     else
         gameState.targetName = ""
         gameState.targetHealthPercent = 100
     end
 
     local px, py = GetPlayerMapPosition("player")
-    gameState.position = {x = px * 100, y = py * 100}
+    gameState.position = {x = px or 0, y = py or 0}
 
     if UnitExists("target") then
         local tx, ty = GetPlayerMapPosition("target")
-        gameState.targetPosition = {x = tx * 100, y = ty * 100}
+        gameState.targetPosition = {x = tx or 0, y = ty or 0}
     end
 
     gameState.buffs = {}
@@ -132,23 +117,11 @@ function frame:SaveState()
 
     local trinket1Slot = 13
     local start1, duration1 = GetInventoryItemCooldown("player", trinket1Slot)
-    gameState.trinketReady = (start1 == 0 or (GetTime() - start1) >= duration1)
+    if start1 then
+        gameState.trinketReady = (start1 == 0 or (GetTime() - start1) >= duration1)
+    end
 
     gameState.potionReady = false
-    for bag = 0, 4 do
-        for slot = 1, GetContainerNumSlots(bag) do
-            local itemLink = GetContainerItemLink(bag, slot)
-            if itemLink then
-                local name = GetItemInfo(itemLink)
-                if name and string.find(name, "Potion") then
-                    local start = GetContainerItemCooldown(bag, slot)
-                    if start == 0 or (GetTime() - start) >= 60 then
-                        gameState.potionReady = true
-                    end
-                end
-            end
-        end
-    end
 
     local json = TableToJSON(gameState)
     local file = io.open(stateFilePath, "w")
