@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 import sys
 
-from core.state_reader import StateReader
+from core.chat_log_reader import ChatLogReader
 from core.key_simulator import KeySimulator
 from core.rotation_engine import RotationEngine
 
@@ -20,7 +20,7 @@ class MainWindow:
         self.window.setGeometry(100, 100, 500, 600)
 
         # Core components
-        self.state_reader = StateReader()
+        self.state_reader = ChatLogReader()
         self.key_simulator = KeySimulator()
         self.rotation_engine = RotationEngine(self.state_reader, self.key_simulator)
 
