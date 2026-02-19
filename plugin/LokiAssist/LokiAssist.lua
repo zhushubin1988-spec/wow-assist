@@ -92,13 +92,11 @@ local function TryGetUnitInfo()
     return data
 end
 
--- Register events
+-- Register events - only events that are confirmed to work
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
-frame:RegisterEvent("UNIT_POWER")
-frame:RegisterEvent("UNIT_HEALTH")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 
