@@ -1,61 +1,59 @@
- name: Build Windows Executable
+name: Build Windows Executable
 
-  on:
-    push:
-      branches: [ main, master ]
-    pull_request:
-      branches: [ main, master ]
-    workflow_dispatch:
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
-  jobs:
-    build:
-      runs-on: windows-latest
+jobs:
+  build:
+    runs-on: windows-latest
 
-      steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install -r requirements.txt
-          pip install pyinstaller
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pyinstaller
 
-      - name: Build with PyInstaller
-        run: |
-          cd backend
-          pyinstaller --name WoWAssist --onefile --windowed --add-data
-  "config;config" main.py
+    - name: Build with PyInstaller
+      run: |
+        cd backend
+        pyinstaller --name WoWAssist --onefile --windowed --add-data "config;config" main.py
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: WoWAssist-Windows
-          path: backend/dist/WoWAssist.exe
-          retention-days: 30
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: WoWAssist-Windows
+        path: backend/dist/WoWAssist.exe
+        retention-days: 30
 
-    release:
-      needs: build
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' ||
-  github.ref == 'refs/heads/master')
-      runs-on: ubuntu-latest
+  release:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
 
-      steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: WoWAssist-Windows
-          path: release
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: WoWAssist-Windows
+        path: release
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/WoWAssist.exe
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/WoWAssist.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
