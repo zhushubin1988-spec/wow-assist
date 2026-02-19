@@ -33,6 +33,13 @@ class RotationEngine:
         self.gcd_remaining = 0
         self.last_gcd_time = 0
 
+        # Keybinds: spell name -> key
+        self.keybinds = {}
+
+    def set_keybinds(self, keybinds: dict):
+        """Set the keybinds (spell name -> key)"""
+        self.keybinds = keybinds
+
     def set_class(self, class_name: str):
         """Set the current class and load its rotation"""
         class_map = {
@@ -139,8 +146,15 @@ class RotationEngine:
         return True
 
     def _cast_spell(self, spell: dict):
-        """Cast a spell"""
-        key = spell.get("key")
+        """Cast a spell using configured keybind"""
+        spell_name = spell.get("name")
+
+        # Look up the key from our keybinds config
+        key = self.keybinds.get(spell_name)
+        if not key:
+            # Fallback to spell key if not in keybinds
+            key = spell.get("key")
+
         if not key:
             return
 
