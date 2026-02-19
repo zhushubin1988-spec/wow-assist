@@ -1,0 +1,185 @@
+"""
+Rotation Engine
+Manages the combat rotation logic
+"""
+import time
+from typing import Dict, List, Optional
+
+from .state_reader import StateReader
+from .key_simulator import KeySimulator
+from config.rotations import get_rotation
+
+
+class RotationEngine:
+    def __init__(self, state_reader: StateReader, key_simulator: KeySimulator):
+        self.state_reader = state_reader
+        self.key_simulator = key_simulator
+        self.is_running = False
+
+        # Current class and settings
+        self.current_class = None
+        self.rotation = None
+
+        # Options
+        self.combat_protect = True
+        self.auto_trinket = False
+        self.auto_potion = False
+        self.auto_follow = False
+        self.manual_interrupt = False
+
+        # State tracking
+        self.last_action_time = 0
+        self.action_cooldown = 0.1  # 100ms between actions
+        self.gcd_remaining = 0
+        self.last_gcd_time = 0
+
+    def set_class(self, class_name: str):
+        """Set the current class and load its rotation"""
+        class_map = {
+            "死亡骑士": "death_knight",
+            "猎人": "hunter",
+            "战士": "warrior",
+            "武僧": "monk",
+            "萨满": "shaman",
+            "德鲁伊": "druid"
+        }
+        self.current_class = class_map.get(class_name, "death_knight")
+        self.rotation = get_rotation(self.current_class)
+
+    def set_options(self, combat_protect: bool = True, auto_trinket: bool = False,
+                   auto_potion: bool = False, auto_follow: bool = False,
+                   manual_interrupt: bool = False):
+        """Set the rotation options"""
+        self.combat_protect = combat_protect
+        self.auto_trinket = auto_trinket
+        self.auto_potion = auto_potion
+        self.auto_follow = auto_follow
+        self.manual_interrupt = manual_interrupt
+
+    def start(self):
+        """Start the rotation engine"""
+        self.is_running = True
+        print(f"Rotation started for class: {self.current_class}")
+
+    def stop(self):
+        """Stop the rotation engine"""
+        self.is_running = False
+        print("Rotation stopped")
+
+    def update(self):
+        """Main update loop called every tick"""
+        if not self.is_running or not self.rotation:
+            return
+
+        # Rate limiting
+        current_time = time.time()
+        if current_time - self.last_action_time < self.action_cooldown:
+            return
+
+        # Check if we should be in combat
+        state = self.state_reader.read_state()
+        in_combat = state.get("inCombat", False)
+
+        if self.combat_protect and not in_combat:
+            return
+
+        # Execute rotation
+        self._execute_rotation(state)
+
+        self.last_action_time = current_time
+
+    def _execute_rotation(self, state: dict):
+        """Execute the rotation based on current state"""
+        if not self.rotation:
+            return
+
+        # Check GCD
+        if self.gcd_remaining > 0:
+            return
+
+        # Check health for self-preservation
+        health_percent = state.get("healthPercent", 100)
+        if health_percent < 20:
+            # Use healthstone or self-heal
+            self.key_simulator.press_key('7', 0.05)
+            return
+
+        # Execute each spell in priority
+        for spell in self.rotation:
+            if self._should_cast_spell(spell, state):
+                self._cast_spell(spell)
+                return
+
+    def _should_cast_spell(self, spell: dict, state: dict) -> bool:
+        """Check if a spell should be cast based on conditions"""
+        spell_name = spell.get("name")
+        key = spell.get("key")
+        conditions = spell.get("conditions", {})
+
+        # Check cooldown
+        cd = self.state_reader.get_cooldown(spell_name)
+        if cd > 0:
+            return False
+
+        # Check power requirement
+        power = state.get("power", 0)
+        power_cost = conditions.get("power", 0)
+        if power < power_cost:
+            return False
+
+        # Check buff requirements
+        if "has_buff" in conditions:
+            if not self.state_reader.has_buff(conditions["has_buff"]):
+                return False
+
+        # Check debuff requirements
+        if "has_not_debuff" in conditions:
+            if self.state_reader.has_debuff(conditions["has_not_debuff"]):
+                return False
+
+        # Check target health
+        if "target_health_above" in conditions:
+            if state.get("targetHealthPercent", 0) < conditions["target_health_above"]:
+                return False
+
+        if "target_health_below" in conditions:
+            if state.get("targetHealthPercent", 100) > conditions["target_health_below"]:
+                return False
+
+        # Check custom condition
+        if "custom" in conditions:
+            custom_func = conditions["custom"]
+            if callable(custom_func) and not custom_func(state, self.state_reader):
+                return False
+
+        return True
+
+    def _cast_spell(self, spell: dict):
+        """Cast a spell"""
+        key = spell.get("key")
+        if not key:
+            return
+
+        # Check if it's a modifier key combo
+        modifier = spell.get("modifier")
+        if modifier:
+            self.key_simulator.press_key_with_modifier(modifier, key)
+        else:
+            self.key_simulator.press_key(key)
+
+        # Set GCD
+        gcd = spell.get("gcd", 1.5)
+        self.gcd_remaining = gcd
+        self.last_gcd_time = time.time()
+
+        # Use trinket on cooldowns if enabled
+        if self.auto_trinket:
+            state = self.state_reader.read_state()
+            if state.get("trinketReady", True):
+                self.key_simulator.use_item("trinket1")
+
+        # Use potion on cooldowns if enabled
+        if self.auto_potion:
+            state = self.state_reader.read_state()
+            if state.get("potionReady", True):
+                self.key_simulator.use_item("potion")

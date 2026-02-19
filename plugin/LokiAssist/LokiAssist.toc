@@ -1,0 +1,8 @@
+## Interface: 100207
+## Title: LokiAssist
+## Notes: WoW自动输出辅助插件
+## Author: LokiAssist
+## Version: 1.0.0
+
+LokiAssist.lua
+core.lua
